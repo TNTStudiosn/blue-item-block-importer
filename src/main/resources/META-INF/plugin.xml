@@ -33,9 +33,10 @@
                 id="BlueImporter.OpenDialog"
                 class="com.tntstudios.blueimporter.actions.OpenImporterDialogAction"
                 text="Blue Item/Block Importer…"
-                description="Abre el asistente para importar ítems y bloques"
-                keymap="Default">
-            <keyboard-shortcut first-keystroke="ctrl alt I"/>
+                description="Abre el asistente para importar ítems y bloques">
+            <keyboard-shortcut
+                    keymap="$default"
+                    first-keystroke="ctrl alt I"/>
         </action>
     </actions>
 </idea-plugin>
