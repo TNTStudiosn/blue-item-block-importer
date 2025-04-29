@@ -1,9 +1,9 @@
 package com.tntstudios.blueimporter.ui;
 
+import com.tntstudios.blueimporter.generator.CodeGenerator;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.ui.DialogWrapper;
@@ -14,9 +14,10 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class ImporterDialog extends DialogWrapper {
     private JPanel content;
@@ -36,9 +37,7 @@ public class ImporterDialog extends DialogWrapper {
         init();
         setTitle("Blue Item/Block Importer");
 
-        // Listener para analizar modelos
         analyzeBtn.addActionListener(e -> doAnalyze());
-        // Listener para generar los archivos
         generateBtn.addActionListener(e -> doGenerate());
     }
 
@@ -57,7 +56,7 @@ public class ImporterDialog extends DialogWrapper {
         }
 
         listModel.clear();
-        for (String tipo : new String[]{"block","item"}) {
+        for (String tipo : new String[]{"block", "item"}) {
             VirtualFile folder = modelsRoot.findChild(tipo);
             if (folder != null) {
                 for (VirtualFile file : folder.getChildren()) {
@@ -89,6 +88,7 @@ public class ImporterDialog extends DialogWrapper {
             String[] parts = entry.split("/");
             String tipo = parts[0];
             String modelName = parts[1];
+
             Map<String,String> textures = parseTextures(project, modId, tipo, modelName);
 
             String displayName = Messages.showInputDialog(
@@ -98,26 +98,33 @@ public class ImporterDialog extends DialogWrapper {
                     capitalize(modelName),
                     null
             );
-            if (displayName == null) return; // cancelar
+            if (displayName == null) return; // usuario canceló
 
-            WriteCommandAction.runWriteCommandAction(project, () -> {
-                createLootTable(project, modId, modelName);
-                createBlockstate(project, modId, modelName, textures);
-                createBlockClass(project, modId, modelName);
-                updateRegistry(project, modId, modelName);
-            });
+            // aquí delegamos TODO en el CodeGenerator
+            CodeGenerator.generate(
+                    project,
+                    modId,
+                    tipo,
+                    modelName,
+                    displayName,
+                    textures
+            );
         }
+
         Messages.showInfoMessage("Generación completada.", "OK");
     }
 
     private Map<String,String> parseTextures(Project project, String modId, String tipo, String modelName) {
-        String path = project.getBasePath() + "/src/main/resources/assets/" + modId + "/models/" + tipo + "/" + modelName + ".json";
+        String path = project.getBasePath()
+                + "/src/main/resources/assets/" + modId
+                + "/models/" + tipo + "/" + modelName + ".json";
         VirtualFile file = LocalFileSystem.getInstance().findFileByPath(path);
         if (file == null) return Collections.emptyMap();
+
         try {
-            String text = new String(file.contentsToByteArray(), StandardCharsets.UTF_8);
+            String text = new String(file.contentsToByteArray(), java.nio.charset.StandardCharsets.UTF_8);
             JsonObject obj = JsonParser.parseString(text).getAsJsonObject();
-            Map<String,String> map = new HashMap<>();
+            Map<String,String> map = new LinkedHashMap<>();
             if (obj.has("textures")) {
                 JsonObject tex = obj.getAsJsonObject("textures");
                 for (Map.Entry<String, JsonElement> e : tex.entrySet()) {
@@ -125,24 +132,10 @@ public class ImporterDialog extends DialogWrapper {
                 }
             }
             return map;
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             Messages.showErrorDialog("Error parseando JSON: " + ex.getMessage(), "Error");
             return Collections.emptyMap();
         }
-    }
-
-    // Métodos stub para generación de archivos
-    private void createLootTable(Project project, String modId, String modelName) {
-        // TODO: implementar escritura de loot table JSON
-    }
-    private void createBlockstate(Project project, String modId, String modelName, Map<String,String> textures) {
-        // TODO: implementar escritura de blockstate JSON
-    }
-    private void createBlockClass(Project project, String modId, String modelName) {
-        // TODO: implementar generación de clase Java
-    }
-    private void updateRegistry(Project project, String modId, String modelName) {
-        // TODO: implementar actualización de archivo de registro
     }
 
     @Nullable
@@ -150,7 +143,6 @@ public class ImporterDialog extends DialogWrapper {
     protected JComponent createCenterPanel() {
         content = new JPanel(new BorderLayout(5,5));
 
-        // Panel superior: configuración
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         top.add(new JLabel("Mod ID:"));
         modIdField = new JTextField(15);
@@ -169,12 +161,10 @@ public class ImporterDialog extends DialogWrapper {
 
         content.add(top, BorderLayout.NORTH);
 
-        // Centro: lista de modelos
         listModel = new DefaultListModel<>();
         modelList = new JList<>(listModel);
         content.add(new JScrollPane(modelList), BorderLayout.CENTER);
 
-        // Sur: botones
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         analyzeBtn = new JButton("Analizar modelos");
         generateBtn = new JButton("Generar código");
