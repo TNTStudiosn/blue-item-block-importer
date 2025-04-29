@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,19 +56,60 @@ public class ImporterDialog extends DialogWrapper {
             return;
         }
 
+        // Limpiar lista
         listModel.clear();
-        for (String tipo : new String[]{"block", "item"}) {
-            VirtualFile folder = modelsRoot.findChild(tipo);
-            if (folder != null) {
-                for (VirtualFile file : folder.getChildren()) {
-                    if ("json".equalsIgnoreCase(file.getExtension())) {
-                        listModel.addElement(tipo + "/" + file.getNameWithoutExtension());
-                    }
+
+        // Detectar modelos en block
+        VirtualFile blockFolder = modelsRoot.findChild("block");
+        List<String> blockNames = new ArrayList<>();
+        if (blockFolder != null) {
+            for (VirtualFile file : blockFolder.getChildren()) {
+                if ("json".equalsIgnoreCase(file.getExtension())) {
+                    blockNames.add(file.getNameWithoutExtension());
                 }
             }
         }
-        if (listModel.isEmpty()) {
+
+        // Detectar modelos en item
+        VirtualFile itemFolder = modelsRoot.findChild("item");
+        List<String> itemNames = new ArrayList<>();
+        if (itemFolder != null) {
+            for (VirtualFile file : itemFolder.getChildren()) {
+                if ("json".equalsIgnoreCase(file.getExtension())) {
+                    itemNames.add(file.getNameWithoutExtension());
+                }
+            }
+        }
+
+        // Si no hay modelos ni en block ni en item
+        if (blockNames.isEmpty() && itemNames.isEmpty()) {
             Messages.showInfoMessage("No se encontraron modelos JSON en 'block' ni 'item'.", "Sin resultados");
+            return;
+        }
+
+        // Si existen solo block y no item, preguntar para generar item a partir de block
+        if (!blockNames.isEmpty() && itemNames.isEmpty()) {
+            int choice = Messages.showYesNoDialog(
+                    "No encontré modelos en carpeta 'item'. ¿Generar modelos de item a partir de los bloques?",
+                    "Generar modelos de item",
+                    Messages.getYesButton(),
+                    Messages.getNoButton(),
+                    null
+            );
+            if (choice == Messages.YES) {
+                for (String name : blockNames) {
+                    listModel.addElement("item/" + name);
+                }
+            }
+        }
+
+        // Agregar entradas de block
+        for (String name : blockNames) {
+            listModel.addElement("block/" + name);
+        }
+        // Agregar entradas de item
+        for (String name : itemNames) {
+            listModel.addElement("item/" + name);
         }
     }
 
@@ -84,12 +126,15 @@ public class ImporterDialog extends DialogWrapper {
             return;
         }
 
+        boolean useGecko = geckoCheck.isSelected();
+        String version = (String) versionCombo.getSelectedItem();
+
         for (String entry : modelos) {
             String[] parts = entry.split("/");
             String tipo = parts[0];
             String modelName = parts[1];
 
-            Map<String,String> textures = parseTextures(project, modId, tipo, modelName);
+            Map<String, String> textures = parseTextures(project, modId, tipo, modelName);
 
             String displayName = Messages.showInputDialog(
                     "Nombre en Lang para '" + modelName + "'?",
@@ -100,21 +145,22 @@ public class ImporterDialog extends DialogWrapper {
             );
             if (displayName == null) return; // usuario canceló
 
-            // aquí delegamos TODO en el CodeGenerator
             CodeGenerator.generate(
                     project,
                     modId,
                     tipo,
                     modelName,
                     displayName,
-                    textures
+                    textures,
+                    useGecko,
+                    version
             );
         }
 
         Messages.showInfoMessage("Generación completada.", "OK");
     }
 
-    private Map<String,String> parseTextures(Project project, String modId, String tipo, String modelName) {
+    private Map<String, String> parseTextures(Project project, String modId, String tipo, String modelName) {
         String path = project.getBasePath()
                 + "/src/main/resources/assets/" + modId
                 + "/models/" + tipo + "/" + modelName + ".json";
@@ -124,7 +170,7 @@ public class ImporterDialog extends DialogWrapper {
         try {
             String text = new String(file.contentsToByteArray(), java.nio.charset.StandardCharsets.UTF_8);
             JsonObject obj = JsonParser.parseString(text).getAsJsonObject();
-            Map<String,String> map = new LinkedHashMap<>();
+            Map<String, String> map = new LinkedHashMap<>();
             if (obj.has("textures")) {
                 JsonObject tex = obj.getAsJsonObject("textures");
                 for (Map.Entry<String, JsonElement> e : tex.entrySet()) {
