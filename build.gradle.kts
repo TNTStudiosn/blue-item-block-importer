@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.17.4"
 }
 
-group = "com.TNTStudios.blueimporter"
+group = "com.TNTStudios.com.tntstudios.blueimporter"
 version = "1.0-SNAPSHOT"
 
 repositories {
