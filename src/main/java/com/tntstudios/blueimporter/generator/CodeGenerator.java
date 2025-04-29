@@ -18,7 +18,10 @@ import java.util.stream.Collectors;
 
 public class CodeGenerator {
     private static final Logger LOG = Logger.getInstance(CodeGenerator.class);
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .disableHtmlEscaping()
+            .create();
 
     /**
      * Punto único de entrada para generar TODO lo necesario de un modelo.
@@ -172,9 +175,9 @@ public class CodeGenerator {
             }
 
             String template =
-                    "package com.tntstudios." + modId + ".blocks;\n" +
+                    "package com.TNTStudios." + modId + ".blocks;\n" +
                             "\n" +
-                            "import com.tntstudios." + modId + ".util.VoxelShapeUtil;\n" +
+                            "import com.TNTStudios." + modId + ".util.VoxelShapeUtil;\n" +
                             "import net.minecraft.block.BlockState;\n" +
                             "import net.minecraft.block.ShapeContext;\n" +
                             "import net.minecraft.state.property.Properties;\n" +
@@ -258,7 +261,7 @@ public class CodeGenerator {
             // Crear fichero básico
             String className = capitalize(modId) + "Items";
             String content =
-                    "package com.tntstudios." + modId + ".registry;\n\n" +
+                    "package com.TNTStudios." + modId + ".registry;\n\n" +
                             "import net.minecraft.item.Item;\n" +
                             "import net.minecraft.item.ItemGroup;\n" +
                             "import net.minecraft.item.ItemStack;\n" +
@@ -307,7 +310,7 @@ public class CodeGenerator {
         if (Files.exists(file)) return;
         // Crear clase VoxelShapeUtil
         String content =
-                "package com.tntstudios." + modId + ".util;\n\n" +
+                "package com.TNTStudios." + modId + ".util;\n\n" +
                         "import net.minecraft.util.shape.VoxelShape;\n" +
                         "import net.minecraft.util.shape.VoxelShapes;\n" +
                         "import net.minecraft.util.math.Box;\n\n" +
@@ -349,7 +352,7 @@ public class CodeGenerator {
             return;
         }
         String content =
-                "package com.tntstudios." + modId + ".registry;\n\n" +
+                "package com.TNTStudios." + modId + ".registry;\n\n" +
                         "import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;\n" +
                         "import net.minecraft.item.ItemGroup;\n" +
                         "import net.minecraft.item.ItemStack;\n" +
@@ -380,33 +383,53 @@ public class CodeGenerator {
         }
     }
 
-    private static void createClientInitializer(Project project,
-                                                String modId) {
+    private static void createClientInitializer(Project project, String modId) {
         LOG.info("  • Creando inicializador cliente");
-        Path file = Paths.get(project.getBasePath(),
-                "src/main/java",
-                "com", "tntstudios", modId, "client",
-                "ClientInitializer.java");
-        if (Files.exists(file)) return;
-        String content =
-                "package com.tntstudios." + modId + ".client;\n\n" +
-                        "import net.fabricmc.api.ClientModInitializer;\n" +
-                        "import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;\n" +
-                        "import net.minecraft.client.render.RenderLayer;\n" +
-                        "import com.tntstudios." + modId + ".registry.BlocksRegistry;\n\n" +
-                        "public class ClientInitializer implements ClientModInitializer {\n" +
-                        "    @Override\n" +
-                        "    public void onInitializeClient() {\n" +
-                        "        // Registrando capas de render\n" +
-                        "        BlockRenderLayerMap.INSTANCE.putBlock(BlocksRegistry.HAPPYMEAL_BLOCK, RenderLayer.getCutout());\n" +
-                        "        // Añade tus bloques aquí\n" +
-                        "    }\n" +
-                        "}";
+        Path clientDir = Paths.get(project.getBasePath(),
+                "src", "client", "java",
+                "com", "TNTStudios", modId, "client");
         try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, content, StandardCharsets.UTF_8);
+            Files.createDirectories(clientDir);
+
+            // 1) Clase para registro de texturas Cutout
+            Path cutoutClass = clientDir.resolve("CutoutRegistrar.java");
+            if (!Files.exists(cutoutClass)) {
+                String cutoutContent =
+                        "package com.TNTStudios." + modId + ".client;\n\n" +
+                                "import net.fabricmc.api.ClientModInitializer;\n" +
+                                "import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;\n" +
+                                "import net.minecraft.client.render.RenderLayer;\n" +
+                                "import com.TNTStudios." + modId + ".registry.BlocksRegistry;\n\n" +
+                                "/**\n" +
+                                " * Clase generada para registrar texturas cutout.\n" +
+                                " * // en tu clase principal de cliente pon:\n" +
+                                " * //     CutoutRegistrar.registerClient();\n" +
+                                " *\n" +
+                                " * // dentro de esa misma clase para registrar en la clase principal de main todos los códigos que creamos:\n" +
+                                " * //     com.TNTStudios." + modId + ".registry.BlocksRegistry.registerAll();\n" +
+                                " */\n" +
+                                "public class CutoutRegistrar implements ClientModInitializer {\n" +
+                                "    @Override\n" +
+                                "    public void onInitializeClient() {\n" +
+                                "        // Registrando capas de render\n" +
+                                "        BlockRenderLayerMap.INSTANCE.putBlock(BlocksRegistry.HAPPYMEAL_BLOCK, RenderLayer.getCutout());\n" +
+                                "        // Añade tus bloques aquí...\n" +
+                                "    }\n" +
+                                "}\n";
+                Files.writeString(cutoutClass, cutoutContent, StandardCharsets.UTF_8);
+            }
+
+            // 2) Comentarios para el usuario:
+            // en tu clase principal de cliente pon:
+            //     CutoutRegistrar.registerClient();
+            //
+            // dentro de esa misma clase principal de main pon:
+            //     BlocksRegistry.registerAll();
+            //     ItemsRegistry.registerAll();
+            //     ViceburgerTabs.register();
         } catch (IOException e) {
             LOG.error("Error creando inicializador cliente: " + e.getMessage(), e);
+            Messages.showErrorDialog("Error creando inicializador cliente: " + e.getMessage(), "Error");
         }
     }
 
